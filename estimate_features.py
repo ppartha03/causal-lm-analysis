@@ -5,17 +5,22 @@ from datasets import load_dataset
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-
+import submitit
 import os
 
-def get_features(text, model_name, batch_size=4):
-  tokenizer = AutoTokenizer.from_pretrained(model_name)
-  model = AutoModel.from_pretrained(model_name, pad_token_id=tokenizer.eos_token_id).to(torch.device('cpu'))
-  model = model.eval()
-  tokenizer.pad_token = tokenizer.eos_token
-  feats = []
-  device = model.device
-  for i in tqdm(range(0,len(text) batch_size)):
+from itertools import product
+from pathlib import Path
+from datetime import datetime
+
+def get_features(text, model_name, batch_size=16):
+    model_dir = "/home/pparth2/scratch/causal-lm-project/causal-lm-analysis/cached"
+    tokenizer = AutoTokenizer.from_pretrained(os.path.join(model_dir, model_name))
+    model = AutoModel.from_pretrained(os.path.join(model_dir, model_name), pad_token_id=tokenizer.eos_token_id).to(torch.device('cpu'))
+    model = model.eval()
+    tokenizer.pad_token = tokenizer.eos_token
+    feats = []
+    device = model.device
+    for i in tqdm(range(0,len(text), batch_size)):
       tokenized_texts = tokenizer.batch_encode_plus(text[i:i+batch_size], return_tensors='pt', truncation=True, max_length=256, padding=True, add_special_tokens=False)['input_ids']
       if isinstance(tokenized_texts, list):
         tokenized_texts = torch.LongTensor(tokenized_texts).unsqueeze(0)
@@ -24,9 +29,9 @@ def get_features(text, model_name, batch_size=4):
       h = out.hidden_states[-1]  # (batch_size, seq_len, dim)
       feats.append(h[:, -1, :].cpu())
 
-  del tokenizer
-  del model
-  return torch.cat(feats).detach().cpu().numpy()
+    del tokenizer
+    del model
+    return torch.cat(feats).detach().cpu().numpy()
 
 def HyperFeatures(config):
     '''
@@ -85,11 +90,12 @@ if __name__ == '__main__':
 
         model, dataset = params
 
-        for sub_data in sub_dataset[dataset]:
+        for sub_data in sub_datasets[dataset]:
             if 'blimp' not in dataset:
-                h_param_list.append({'dataset':dataset, 'sub_dataset': sub_data, 'split': splits[sub_data], 'model': model})
+                for split in splits[sub_data]:
+                    h_param_list.append({'dataset':dataset, 'sub_dataset': sub_data, 'split': split, 'model': model, 'batch_size':16})
             else:
-                h_param_list.append({'dataset':dataset, 'sub_dataset': sub_data, 'model': model})
+                h_param_list.append({'dataset':dataset, 'sub_dataset': sub_data, 'model': model, 'batch_size':16})
 
     # run by submitit
     d = datetime.today()
@@ -106,7 +112,7 @@ if __name__ == '__main__':
     workers_per_gpu = 10
     executor = submitit.AutoExecutor(folder=submitit_logdir)
     executor.update_parameters(
-        timeout_min=100,
+        timeout_min=120,
         gpus_per_node=num_gpus,
         slurm_additional_parameters={"account": "rrg-bengioy-ad"},
         tasks_per_node=num_gpus,
@@ -115,4 +121,4 @@ if __name__ == '__main__':
         slurm_array_parallelism=100,
     )
     job = executor.map_array(HyperFeatures, h_param_list)
-    print('Jobs submitted!')
+    print(str(len(h_param_list)) + ' Jobs submitted!')

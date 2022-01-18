@@ -74,7 +74,7 @@ def HyperMauve(config):
     out_nouns = discrete_mauve(p_nouns, q_nouns)
     out_verbs = discrete_mauve(p_verbs, q_verbs)
 
-    out = compute_mauve(p_features=p_features_s, q_features=p_features_s,
+    out = compute_mauve(p_features=p_features_s, q_features=q_features_s,
                     device_id=0, max_text_length=256)
 
     plot_and_save(config, out_nouns, arg = 'noun')

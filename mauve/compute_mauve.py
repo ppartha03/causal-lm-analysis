@@ -219,18 +219,18 @@ def cluster_feats(p, q, num_clusters,
     q_labels = labels[:len(q)]
     p_labels = labels[len(q):]
 
-    clusters = {k:{'p':[],'q':[]} for k in range(n_clusters)}
+    clusters = {k:{'p':[],'q':[]} for k in range(num_clusters)}
     for indx in range(len(p_labels)):
-      clusters[p_labels[indx][0]]['p'].append(indx)
+      clusters[p_labels[indx]]['p'].append(indx)
 
     for indx in range(len(q_labels)):
-      clusters[q_labels[indx][0]]['q'].append(indx)
+      clusters[q_labels[indx]]['q'].append(indx)
 
     q_bins = np.histogram(q_labels, bins=num_clusters,
                            range=[0, num_clusters], density=True)[0]
     p_bins = np.histogram(p_labels, bins=num_clusters,
                           range=[0, num_clusters], density=True)[0]
-    return p_bins / p_bins.sum(), q_bins / q_bins.sum(), cluster_stats
+    return p_bins / p_bins.sum(), q_bins / q_bins.sum(), clusters
 
 
 def kl_multinomial(p, q):
